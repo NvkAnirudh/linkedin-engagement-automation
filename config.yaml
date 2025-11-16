@@ -2,10 +2,10 @@
 
 # Profiles to track (LinkedIn profile URLs or usernames)
 profiles:
-  - url: "https://www.linkedin.com/in/example-profile/"
-    name: "Zach"
-    # Optional: custom comment style for this profile
-    comment_style: "professional"  # professional, casual, enthusiastic, thoughtful
+  - url: "https://www.linkedin.com/in/eczachly/"
+    name: "Zach Wilson"
+    # Note: Comment style is now automatically matched to the post's detected tone
+    # No need to specify a fixed style - the AI will adapt!
 
 # Monitoring settings
 monitoring:
