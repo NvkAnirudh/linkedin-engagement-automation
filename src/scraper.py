@@ -94,11 +94,29 @@ class LinkedInScraper:
                         print(f"{Fore.GREEN}✅ Challenge appears to be solved!{Style.RESET_ALL}")
                         break
 
-            # Verify we're logged in (increased timeout)
+            # Verify we're logged in
             print(f"{Fore.CYAN}Verifying login...{Style.RESET_ALL}")
-            await self.page.wait_for_selector('nav.global-nav, div.global-nav, header', timeout=30000)
+            current_url = self.page.url
 
-            print(f"{Fore.GREEN}✅ Login verification successful!{Style.RESET_ALL}")
+            # Check if we're on a logged-in page
+            logged_in_urls = ['/feed/', '/mynetwork/', '/in/', '/messaging/', '/notifications/', '/jobs/']
+
+            if any(url_part in current_url for url_part in logged_in_urls):
+                print(f"{Fore.GREEN}✅ Login successful! Redirected to: {current_url}{Style.RESET_ALL}")
+            else:
+                # Try to find navigation elements as fallback verification
+                try:
+                    await self.page.wait_for_selector(
+                        'nav, header, div[id*="global-nav"], div[class*="global-nav"]',
+                        timeout=10000
+                    )
+                    print(f"{Fore.GREEN}✅ Login verification successful!{Style.RESET_ALL}")
+                except Exception as verify_error:
+                    # If we can't find nav but we're not on login page, assume success
+                    if '/login' not in current_url and '/uas/' not in current_url:
+                        print(f"{Fore.YELLOW}⚠️  Could not verify nav element, but URL suggests login success{Style.RESET_ALL}")
+                    else:
+                        raise verify_error
 
         except Exception as e:
             print(f"{Fore.RED}Login error details: {str(e)}{Style.RESET_ALL}")
