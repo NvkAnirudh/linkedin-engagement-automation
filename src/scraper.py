@@ -8,6 +8,46 @@ from playwright.async_api import async_playwright, Browser, Page, TimeoutError a
 from colorama import Fore, Style
 
 
+def parse_linkedin_relative_time(time_text: str) -> Optional[datetime]:
+    """Parse LinkedIn's relative time format (e.g., '1d', '2w', '3mo') to datetime.
+
+    Args:
+        time_text: Relative time string from LinkedIn (e.g., '1d', '2w', '1mo', '3y')
+
+    Returns:
+        datetime object or None if parsing fails
+    """
+    if not time_text:
+        return None
+
+    time_text = time_text.strip().lower()
+
+    # Match patterns like: 1d, 2w, 3mo, 1y, 1h, 30m
+    match = re.match(r'(\d+)\s*(m|h|d|w|mo|y)', time_text)
+    if not match:
+        return None
+
+    value = int(match.group(1))
+    unit = match.group(2)
+
+    now = datetime.now()
+
+    if unit == 'm':  # minutes
+        return now - timedelta(minutes=value)
+    elif unit == 'h':  # hours
+        return now - timedelta(hours=value)
+    elif unit == 'd':  # days
+        return now - timedelta(days=value)
+    elif unit == 'w':  # weeks
+        return now - timedelta(weeks=value)
+    elif unit == 'mo':  # months (approximate as 30 days)
+        return now - timedelta(days=value * 30)
+    elif unit == 'y':  # years (approximate as 365 days)
+        return now - timedelta(days=value * 365)
+
+    return None
+
+
 class LinkedInScraper:
     """Scraper for LinkedIn profiles and posts."""
 
@@ -173,9 +213,11 @@ class LinkedInScraper:
         scroll_attempts = 0
         max_scroll_attempts = 10
 
-        while len(posts) < max_posts and scroll_attempts < max_scroll_attempts:
+        found_old_posts = False
+
+        while len(posts) < max_posts and scroll_attempts < max_scroll_attempts and not found_old_posts:
             # Extract posts from current view
-            new_posts = await self._extract_posts_from_page(cutoff_date)
+            new_posts, hit_old_posts = await self._extract_posts_from_page(cutoff_date)
 
             for post in new_posts:
                 if post['post_id'] not in [p['post_id'] for p in posts]:
@@ -183,6 +225,12 @@ class LinkedInScraper:
 
                     if len(posts) >= max_posts:
                         break
+
+            # If we encountered posts older than cutoff, stop scrolling
+            if hit_old_posts:
+                print(f"{Fore.YELLOW}⏹️  Reached posts older than {recent_days} days, stopping...{Style.RESET_ALL}")
+                found_old_posts = True
+                break
 
             # Scroll down to load more
             await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
@@ -200,16 +248,17 @@ class LinkedInScraper:
         print(f"{Fore.GREEN}Found {len(posts)} posts{Style.RESET_ALL}")
         return posts[:max_posts]
 
-    async def _extract_posts_from_page(self, cutoff_date: Optional[datetime] = None) -> List[Dict]:
+    async def _extract_posts_from_page(self, cutoff_date: Optional[datetime] = None) -> tuple:
         """Extract posts from current page view.
 
         Args:
             cutoff_date: Only extract posts after this date
 
         Returns:
-            List of post dictionaries
+            Tuple of (list of post dictionaries, bool indicating if old posts were found)
         """
         posts = []
+        found_old_posts = False
 
         # Find all post containers
         post_containers = await self.page.query_selector_all(
@@ -220,14 +269,21 @@ class LinkedInScraper:
             try:
                 post_data = await self._extract_post_data(container)
 
-                if post_data and (not cutoff_date or post_data['timestamp'] >= cutoff_date):
+                if post_data:
+                    # Check if post is within date range
+                    if cutoff_date and post_data['timestamp'] < cutoff_date:
+                        # Found a post older than our cutoff
+                        found_old_posts = True
+                        # Don't add this post, but continue checking others in this batch
+                        continue
+
                     posts.append(post_data)
 
             except Exception as e:
                 # Skip posts that fail to extract
                 continue
 
-        return posts
+        return posts, found_old_posts
 
     async def _extract_post_data(self, container) -> Optional[Dict]:
         """Extract data from a single post container.
@@ -272,7 +328,9 @@ class LinkedInScraper:
                 content = content.strip()
 
             # Extract timestamp
-            timestamp = datetime.now()
+            timestamp = None
+
+            # Try to get exact timestamp from datetime attribute
             time_element = await container.query_selector('time[datetime]')
             if time_element:
                 datetime_str = await time_element.get_attribute('datetime')
@@ -280,6 +338,30 @@ class LinkedInScraper:
                     timestamp = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
                 except:
                     pass
+
+            # If no exact timestamp, try to parse relative time text
+            if not timestamp:
+                # LinkedIn shows relative time like "1d", "2w", "3mo" in the time element or nearby
+                time_text_selectors = [
+                    'time',
+                    'span.feed-shared-actor__sub-description',
+                    'span.update-components-actor__sub-description',
+                    'span[aria-hidden="true"]'
+                ]
+
+                for selector in time_text_selectors:
+                    time_elem = await container.query_selector(selector)
+                    if time_elem:
+                        time_text = await time_elem.inner_text()
+                        if time_text:
+                            parsed_time = parse_linkedin_relative_time(time_text)
+                            if parsed_time:
+                                timestamp = parsed_time
+                                break
+
+            # Default to now if we still couldn't parse it
+            if not timestamp:
+                timestamp = datetime.now()
 
             # Extract engagement metrics
             likes = await self._extract_metric(container, 'reactions', 'reaction-count')
