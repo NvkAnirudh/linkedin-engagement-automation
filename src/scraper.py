@@ -61,7 +61,7 @@ class LinkedInScraper:
 
         try:
             # Navigate to LinkedIn login page
-            await self.page.goto('https://www.linkedin.com/login', wait_until='networkidle')
+            await self.page.goto('https://www.linkedin.com/login', wait_until='networkidle', timeout=30000)
 
             # Fill in credentials
             await self.page.fill('input[name="session_key"]', self.email)
@@ -71,18 +71,38 @@ class LinkedInScraper:
             await self.page.click('button[type="submit"]')
 
             # Wait for navigation
-            await self.page.wait_for_load_state('networkidle')
+            await self.page.wait_for_load_state('networkidle', timeout=30000)
 
-            # Check if login was successful
-            if '/checkpoint/challenge' in self.page.url or '/challenge' in self.page.url:
-                print(f"{Fore.YELLOW}⚠️  LinkedIn security checkpoint detected. Please solve manually.{Style.RESET_ALL}")
-                print(f"{Fore.YELLOW}Waiting 60 seconds for manual intervention...{Style.RESET_ALL}")
-                await asyncio.sleep(60)
+            # Check for security checkpoints (multiple possible URLs)
+            current_url = self.page.url
+            checkpoint_keywords = ['/checkpoint/', '/challenge/', '/uas/login-submit', '/add-phone', '/verify']
 
-            # Verify we're logged in
-            await self.page.wait_for_selector('nav.global-nav', timeout=10000)
+            if any(keyword in current_url for keyword in checkpoint_keywords):
+                print(f"{Fore.YELLOW}⚠️  LinkedIn security checkpoint detected!{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}Current URL: {current_url}{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}📧 Check your email for verification or solve the CAPTCHA in the browser.{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}Waiting 120 seconds for manual intervention...{Style.RESET_ALL}")
+
+                # Wait and check every 10 seconds
+                for i in range(12):
+                    await asyncio.sleep(10)
+                    print(f"{Fore.CYAN}  ... {(i+1)*10}s elapsed{Style.RESET_ALL}")
+
+                    # Check if user solved the challenge
+                    current_url = self.page.url
+                    if not any(keyword in current_url for keyword in checkpoint_keywords):
+                        print(f"{Fore.GREEN}✅ Challenge appears to be solved!{Style.RESET_ALL}")
+                        break
+
+            # Verify we're logged in (increased timeout)
+            print(f"{Fore.CYAN}Verifying login...{Style.RESET_ALL}")
+            await self.page.wait_for_selector('nav.global-nav, div.global-nav, header', timeout=30000)
+
+            print(f"{Fore.GREEN}✅ Login verification successful!{Style.RESET_ALL}")
 
         except Exception as e:
+            print(f"{Fore.RED}Login error details: {str(e)}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Current URL: {self.page.url}{Style.RESET_ALL}")
             raise Exception(f"Failed to login to LinkedIn: {str(e)}")
 
     async def get_profile_posts(
