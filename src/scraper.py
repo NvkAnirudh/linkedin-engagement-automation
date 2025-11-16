@@ -225,15 +225,24 @@ class LinkedInScraper:
             'div.feed-shared-update-v2, li.profile-creator-shared-feed-update__container'
         )
 
-        for container in post_containers:
+        print(f"{Fore.CYAN}Found {len(post_containers)} post containers{Style.RESET_ALL}")
+
+        if len(post_containers) == 0:
+            print(f"{Fore.YELLOW}⚠️  No post containers found. LinkedIn's HTML structure may have changed.{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Try using HEADLESS=false to see what the page looks like.{Style.RESET_ALL}")
+
+        for i, container in enumerate(post_containers, 1):
             try:
+                print(f"{Fore.CYAN}Checking post {i}/{len(post_containers)}...{Style.RESET_ALL}")
+
                 # Check if this is a repost
-                # LinkedIn shows "Name reposted this" or similar text for reposts
                 is_repost = await self._is_repost(container)
 
                 if is_repost:
-                    print(f"{Fore.YELLOW}⏭️  Skipping repost{Style.RESET_ALL}")
+                    print(f"{Fore.YELLOW}  ⏭️  Skipping repost{Style.RESET_ALL}")
                     continue
+
+                print(f"{Fore.CYAN}  Not a repost, extracting data...{Style.RESET_ALL}")
 
                 # Extract the post data
                 post_data = await self._extract_post_data(container)
@@ -241,9 +250,11 @@ class LinkedInScraper:
                 if post_data:
                     print(f"{Fore.GREEN}✓ Found original post: {post_data['post_id']}{Style.RESET_ALL}")
                     return post_data
+                else:
+                    print(f"{Fore.YELLOW}  Failed to extract post data{Style.RESET_ALL}")
 
             except Exception as e:
-                # Skip posts that fail to extract
+                print(f"{Fore.YELLOW}  Error processing post: {str(e)}{Style.RESET_ALL}")
                 continue
 
         return None
@@ -258,31 +269,27 @@ class LinkedInScraper:
             True if post is a repost, False otherwise
         """
         try:
-            # Look for repost indicators
-            repost_indicators = [
-                'span.update-components-actor__description:has-text("reposted")',
-                'span:has-text("reposted this")',
-                'span.feed-shared-actor__description:has-text("reposted")',
-                'div:has-text("reposted")'
+            # Get text from the post header/actor area
+            header_selectors = [
+                'span.update-components-actor__description',
+                'span.feed-shared-actor__description',
+                'div.update-components-actor__description'
             ]
 
-            for selector in repost_indicators:
+            for selector in header_selectors:
                 element = await container.query_selector(selector)
                 if element:
                     text = await element.inner_text()
-                    if text and 'repost' in text.lower():
-                        return True
-
-            # Also check for reshare icon or badge
-            reshare_icon = await container.query_selector('svg[data-test-icon="repost-medium"], svg[data-test-icon="share-medium"]')
-            if reshare_icon:
-                # Check if it's in a prominent position (indicating a reshare)
-                return True
+                    if text:
+                        text_lower = text.lower().strip()
+                        # Check for specific repost phrases in the header
+                        if 'reposted this' in text_lower or 'shared this' in text_lower:
+                            return True
 
             return False
 
         except Exception:
-            # If we can't determine, assume it's not a repost
+            # If we can't determine, assume it's NOT a repost (safer default)
             return False
 
     async def _extract_posts_from_page(self, cutoff_date: Optional[datetime] = None) -> tuple:
