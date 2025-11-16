@@ -61,7 +61,7 @@ class LinkedInScraper:
 
         try:
             # Navigate to LinkedIn login page
-            await self.page.goto('https://www.linkedin.com/login', wait_until='networkidle', timeout=30000)
+            await self.page.goto('https://www.linkedin.com/login', wait_until='domcontentloaded', timeout=15000)
 
             # Fill in credentials
             await self.page.fill('input[name="session_key"]', self.email)
@@ -152,14 +152,15 @@ class LinkedInScraper:
         activity_url = f"{profile_url}recent-activity/all/"
 
         try:
-            await self.page.goto(activity_url, wait_until='networkidle', timeout=30000)
-            await asyncio.sleep(2)  # Wait for dynamic content
+            await self.page.goto(activity_url, wait_until='load', timeout=20000)
+            await asyncio.sleep(3)  # Wait for dynamic content
 
         except PlaywrightTimeout:
             print(f"{Fore.YELLOW}Timeout loading profile, trying direct posts URL...{Style.RESET_ALL}")
             # Try alternative URL
             activity_url = f"{profile_url}detail/recent-activity/shares/"
-            await self.page.goto(activity_url, wait_until='networkidle', timeout=30000)
+            await self.page.goto(activity_url, wait_until='load', timeout=20000)
+            await asyncio.sleep(3)
 
         posts = []
         cutoff_date = None
