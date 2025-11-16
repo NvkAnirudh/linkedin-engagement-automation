@@ -41,21 +41,39 @@ This tool **automates** the entire workflow, generating thoughtful, contextual c
 
 ### Setup Steps
 
+#### Option 1: Quick Setup with uv (Recommended)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package installer. Simply run:
+
+```bash
+./setup.sh
+```
+
+The script will:
+- Check for uv and offer to install it if missing
+- Create a virtual environment
+- Install all dependencies
+- Install Playwright browsers
+- Set up configuration files
+
+#### Option 2: Manual Setup
+
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
    cd linkedin-engagement-automation
    ```
 
-2. **Create a virtual environment**:
+2. **Install uv** (if not already installed):
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-3. **Install dependencies**:
+3. **Create virtual environment and install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv pip install -r requirements.txt
    ```
 
 4. **Install Playwright browsers**:
@@ -140,25 +158,31 @@ safety:
 
 ## Usage
 
+All commands can be run with either the activated virtual environment or using `uv run` (no activation needed).
+
 ### Check Configuration
 
 Verify your setup is correct:
 ```bash
+# With activated venv
 python main.py check
+
+# Or with uv run (no activation needed)
+uv run main.py check
 ```
 
 ### Run Single Check
 
 Run once and exit:
 ```bash
-python main.py run
+uv run main.py run
 ```
 
 ### Continuous Monitoring
 
 Run continuously with configured interval:
 ```bash
-python main.py monitor
+uv run main.py monitor
 ```
 
 Press `Ctrl+C` to stop.
@@ -167,14 +191,14 @@ Press `Ctrl+C` to stop.
 
 See tracking statistics:
 ```bash
-python main.py stats
+uv run main.py stats
 ```
 
 ### View Configuration
 
 Display current configuration:
 ```bash
-python main.py config
+uv run main.py config
 ```
 
 ## Output

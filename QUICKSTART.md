@@ -4,21 +4,30 @@ Get up and running in 5 minutes!
 
 ## Step 1: Install
 
-### Linux/macOS
+### Quick Setup (Recommended)
+
+**Linux/macOS:**
 ```bash
 ./setup.sh
 ```
 
-### Windows
+**Windows:**
 ```bash
 setup.bat
 ```
 
-Or manually:
+The setup script uses [uv](https://github.com/astral-sh/uv) for fast dependency installation.
+
+### Manual Setup
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create venv and install deps
+uv venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+uv pip install -r requirements.txt
 playwright install chromium
 cp .env.example .env
 ```
@@ -48,19 +57,23 @@ profiles:
 ## Step 4: Test Setup
 
 ```bash
+# With activated venv
 python main.py check
+
+# Or with uv (no activation needed)
+uv run main.py check
 ```
 
 ## Step 5: Run!
 
 ### Single check:
 ```bash
-python main.py run
+uv run main.py run
 ```
 
 ### Continuous monitoring:
 ```bash
-python main.py monitor
+uv run main.py monitor
 ```
 
 ## Step 6: Review Results
@@ -71,11 +84,13 @@ Check `data/tracked_posts.xlsx` for all tracked posts and generated comments!
 
 | Command | Description |
 |---------|-------------|
-| `python main.py check` | Verify setup |
-| `python main.py run` | Run once |
-| `python main.py monitor` | Run continuously |
-| `python main.py stats` | View statistics |
-| `python main.py config` | Show configuration |
+| `uv run main.py check` | Verify setup |
+| `uv run main.py run` | Run once |
+| `uv run main.py monitor` | Run continuously |
+| `uv run main.py stats` | View statistics |
+| `uv run main.py config` | Show configuration |
+
+> **Tip:** Use `uv run` to run commands without activating the virtual environment!
 
 ## Tips
 
