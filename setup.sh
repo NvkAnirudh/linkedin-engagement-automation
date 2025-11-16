@@ -41,8 +41,13 @@ echo ""
 
 # Check Python version
 echo "Checking Python version..."
-python_version=$(python3 --version 2>&1 | grep -oP '\d+\.\d+')
+python_version=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
 required_version="3.8"
+
+if [ -z "$python_version" ]; then
+    echo "❌ Could not detect Python version. Please ensure Python 3.8+ is installed."
+    exit 1
+fi
 
 if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
     echo "❌ Python 3.8 or higher is required. Found: $python_version"
