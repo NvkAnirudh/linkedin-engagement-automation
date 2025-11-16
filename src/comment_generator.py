@@ -54,18 +54,16 @@ class CommentGenerator:
 
         Args:
             post_content: Content of the LinkedIn post
-            style: Comment style override
+            style: Ignored - we match the post's tone instead
             author_name: Name of the post author
 
         Returns:
             Dictionary with 'comment', 'tone', and 'reasoning'
         """
-        style = style or self.default_style
+        # Build the prompt (style parameter is now ignored in favor of tone matching)
+        prompt = self._build_prompt(post_content, author_name)
 
-        # Build the prompt
-        prompt = self._build_prompt(post_content, style, author_name)
-
-        print(f"{Fore.CYAN}Generating comment using {self.provider}...{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Generating tone-matched comment using {self.provider}...{Style.RESET_ALL}")
 
         try:
             if self.provider == "openai":
@@ -89,52 +87,53 @@ class CommentGenerator:
                 'reasoning': f"Error: {str(e)}"
             }
 
-    def _build_prompt(self, post_content: str, style: str, author_name: str) -> str:
+    def _build_prompt(self, post_content: str, author_name: str) -> str:
         """Build the AI prompt for comment generation.
 
         Args:
             post_content: Content of the post
-            style: Desired comment style
             author_name: Name of the post author
 
         Returns:
             Formatted prompt string
         """
-        length_guide = {
-            'short': '5-10 words',
-            'medium': '10-20 words',
-            'long': '20-30 words'
-        }
-
-        emoji_instruction = "Include 1-2 relevant emojis." if self.include_emojis else "Do not use emojis."
-
-        tone_instruction = ""
-        if self.analyze_tone:
-            tone_instruction = """
-First, analyze the tone of the post (e.g., inspirational, informative, celebratory, thoughtful, questioning, controversial, personal story, professional achievement).
-"""
+        emoji_instruction = "Include 1-2 relevant emojis if appropriate for the tone." if self.include_emojis else "Do not use emojis unless the post's tone calls for it."
 
         author_info = f" by {author_name}" if author_name else ""
 
-        prompt = f"""You are a LinkedIn engagement expert. Generate a thoughtful, authentic one-liner comment for a LinkedIn post{author_info}.
+        prompt = f"""You are a LinkedIn engagement expert. Generate an authentic, valuable comment for a LinkedIn post{author_info}.
 
 POST CONTENT:
 {post_content}
 
-REQUIREMENTS:
-{tone_instruction}
-- Style: {style} (professional=business-appropriate, casual=friendly and relaxed, enthusiastic=energetic and excited, thoughtful=deep and reflective, supportive=encouraging and positive)
-- Length: {length_guide.get(self.length, '5-10 words')}
-- {emoji_instruction}
-- Be authentic and add value - avoid generic comments like "Great post!"
-- Match the tone of the original post
-- Show you actually read and understood the content
-- Be concise and impactful
+INSTRUCTIONS:
+1. ANALYZE THE TONE: Carefully analyze the post's tone and style. Consider:
+   - Is it humorous, serious, inspirational, technical, informative, celebratory, thoughtful?
+   - What's the writing style? Casual, professional, technical, storytelling?
+   - What emotions or energy does it convey?
+
+2. MATCH THE TONE: Your comment should mirror the post's tone and style:
+   - If the post is humorous and witty, be humorous and witty
+   - If it's technical and informative, be technical and add insight
+   - If it's inspirational, be supportive and motivational
+   - If it's casual, be casual. If professional, be professional.
+
+3. LENGTH & SUBSTANCE:
+   - Don't force a one-liner if the context deserves more substance
+   - Can be 1-3 sentences depending on what fits best
+   - Add real value - insight, agreement, related perspective, or thoughtful question
+   - Avoid generic comments like "Great post!" or "Thanks for sharing!"
+
+4. AUTHENTICITY:
+   - Show you actually read and understood the content
+   - Reference specific points from the post when appropriate
+   - Be genuine and conversational
+   - {emoji_instruction}
 
 OUTPUT FORMAT:
-Tone: [detected tone]
-Comment: [your one-liner comment]
-Reasoning: [brief explanation of why this comment fits]
+Tone: [detected tone and style - be specific, e.g. "humorous, technical, informative"]
+Comment: [your tone-matched comment]
+Reasoning: [brief explanation of how your comment matches the post's tone and adds value]
 
 Generate the comment now:"""
 
@@ -154,15 +153,15 @@ Generate the comment now:"""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a LinkedIn engagement expert who writes authentic, valuable comments."
+                    "content": "You are a LinkedIn engagement expert who writes authentic, tone-matched comments that adapt to each post's unique style and energy."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            temperature=0.7,
-            max_tokens=200
+            temperature=0.8,  # Increased for more creative, tone-matched responses
+            max_tokens=300    # Increased to allow 1-3 sentence comments
         )
 
         return response.choices[0].message.content
@@ -178,8 +177,8 @@ Generate the comment now:"""
         """
         message = self.client.messages.create(
             model=self.model,
-            max_tokens=200,
-            temperature=0.7,
+            max_tokens=300,    # Increased to allow 1-3 sentence comments
+            temperature=0.8,   # Increased for more creative, tone-matched responses
             messages=[
                 {
                     "role": "user",
