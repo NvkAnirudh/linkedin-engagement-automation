@@ -341,6 +341,8 @@ class LinkedInScraper:
         try:
             # Extract post ID from data attribute or URL
             post_id = None
+
+            # Try method 1: data-urn attribute
             urn_element = await container.query_selector('[data-urn]')
             if urn_element:
                 urn = await urn_element.get_attribute('data-urn')
@@ -349,27 +351,68 @@ class LinkedInScraper:
                     match = re.search(r':(\d+)', urn)
                     if match:
                         post_id = match.group(1)
+                        print(f"{Fore.CYAN}    Found post_id from data-urn: {post_id}{Style.RESET_ALL}")
 
+            # Try method 2: permalink in feed
             if not post_id:
-                # Try to get from permalink
                 permalink = await container.query_selector('a[href*="/feed/update/"]')
                 if permalink:
                     href = await permalink.get_attribute('href')
-                    match = re.search(r'update:urn:li:activity:(\d+)', href)
-                    if match:
-                        post_id = match.group(1)
+                    if href:
+                        match = re.search(r'urn:li:activity:(\d+)', href)
+                        if match:
+                            post_id = match.group(1)
+                            print(f"{Fore.CYAN}    Found post_id from permalink: {post_id}{Style.RESET_ALL}")
+
+            # Try method 3: activity link
+            if not post_id:
+                activity_link = await container.query_selector('a[href*="/activity/"]')
+                if activity_link:
+                    href = await activity_link.get_attribute('href')
+                    if href:
+                        match = re.search(r'activity-(\d+)', href)
+                        if match:
+                            post_id = match.group(1)
+                            print(f"{Fore.CYAN}    Found post_id from activity link: {post_id}{Style.RESET_ALL}")
+
+            # Try method 4: any link with numbers
+            if not post_id:
+                all_links = await container.query_selector_all('a[href]')
+                for link in all_links[:5]:  # Check first 5 links
+                    href = await link.get_attribute('href')
+                    if href and ('activity' in href or 'update' in href):
+                        match = re.search(r'(\d{19})', href)  # LinkedIn activity IDs are 19 digits
+                        if match:
+                            post_id = match.group(1)
+                            print(f"{Fore.CYAN}    Found post_id from link scan: {post_id}{Style.RESET_ALL}")
+                            break
 
             if not post_id:
-                return None
+                # Generate a fallback ID from timestamp
+                post_id = f"unknown_{int(datetime.now().timestamp())}"
+                print(f"{Fore.YELLOW}    No post_id found, using fallback: {post_id}{Style.RESET_ALL}")
 
             # Extract post content/text
             content = ""
-            content_element = await container.query_selector(
-                '.feed-shared-update-v2__description, .feed-shared-text, .update-components-text'
-            )
-            if content_element:
-                content = await content_element.inner_text()
-                content = content.strip()
+            content_selectors = [
+                '.feed-shared-update-v2__description',
+                '.feed-shared-text',
+                '.update-components-text',
+                'div[class*="commentary"]',
+                'span[dir="ltr"]'
+            ]
+
+            for selector in content_selectors:
+                content_element = await container.query_selector(selector)
+                if content_element:
+                    content = await content_element.inner_text()
+                    content = content.strip()
+                    if content:
+                        print(f"{Fore.CYAN}    Found content ({len(content)} chars): {content[:50]}...{Style.RESET_ALL}")
+                        break
+
+            if not content:
+                print(f"{Fore.YELLOW}    No content found{Style.RESET_ALL}")
 
             # Extract timestamp
             timestamp = None
@@ -420,7 +463,7 @@ class LinkedInScraper:
                 if post_url and not post_url.startswith('http'):
                     post_url = f"https://www.linkedin.com{post_url}"
 
-            return {
+            post_data = {
                 'post_id': post_id,
                 'content': content,
                 'timestamp': timestamp,
@@ -431,7 +474,13 @@ class LinkedInScraper:
                 'scraped_at': datetime.now()
             }
 
+            print(f"{Fore.GREEN}    Successfully extracted post data{Style.RESET_ALL}")
+            return post_data
+
         except Exception as e:
+            print(f"{Fore.RED}    Exception during extraction: {str(e)}{Style.RESET_ALL}")
+            import traceback
+            print(f"{Fore.RED}    {traceback.format_exc()}{Style.RESET_ALL}")
             return None
 
     async def _extract_metric(self, container, keyword: str, aria_label: str) -> int:
