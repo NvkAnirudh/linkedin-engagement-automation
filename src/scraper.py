@@ -177,13 +177,13 @@ class LinkedInScraper:
 
         Args:
             profile_url: LinkedIn profile URL
-            max_posts: Maximum number of posts to fetch
-            recent_days: Only fetch posts from last N days
+            max_posts: Ignored - we only get 1 latest original post
+            recent_days: Ignored - we only get the latest post
 
         Returns:
-            List of post dictionaries
+            List containing the single latest original post
         """
-        print(f"{Fore.CYAN}Fetching posts from {profile_url}...{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Fetching latest original post from {profile_url}...{Style.RESET_ALL}")
 
         # Navigate to profile activity page
         if not profile_url.endswith('/'):
@@ -202,51 +202,88 @@ class LinkedInScraper:
             await self.page.goto(activity_url, wait_until='load', timeout=20000)
             await asyncio.sleep(3)
 
-        posts = []
-        cutoff_date = None
+        # Find the first original post (not a repost)
+        print(f"{Fore.CYAN}Looking for the latest original post (excluding reposts)...{Style.RESET_ALL}")
 
-        if recent_days:
-            cutoff_date = datetime.now() - timedelta(days=recent_days)
+        original_post = await self._find_first_original_post()
 
-        # Scroll and collect posts
-        last_height = 0
-        scroll_attempts = 0
-        max_scroll_attempts = 10
+        if original_post:
+            print(f"{Fore.GREEN}✅ Found 1 original post{Style.RESET_ALL}")
+            return [original_post]
+        else:
+            print(f"{Fore.YELLOW}⚠️  No original posts found on current page{Style.RESET_ALL}")
+            return []
 
-        found_old_posts = False
+    async def _find_first_original_post(self) -> Optional[Dict]:
+        """Find the first original post (not a repost) on the current page.
 
-        while len(posts) < max_posts and scroll_attempts < max_scroll_attempts and not found_old_posts:
-            # Extract posts from current view
-            new_posts, hit_old_posts = await self._extract_posts_from_page(cutoff_date)
+        Returns:
+            Post dictionary or None if no original post found
+        """
+        # Find all post containers
+        post_containers = await self.page.query_selector_all(
+            'div.feed-shared-update-v2, li.profile-creator-shared-feed-update__container'
+        )
 
-            for post in new_posts:
-                if post['post_id'] not in [p['post_id'] for p in posts]:
-                    posts.append(post)
+        for container in post_containers:
+            try:
+                # Check if this is a repost
+                # LinkedIn shows "Name reposted this" or similar text for reposts
+                is_repost = await self._is_repost(container)
 
-                    if len(posts) >= max_posts:
-                        break
+                if is_repost:
+                    print(f"{Fore.YELLOW}⏭️  Skipping repost{Style.RESET_ALL}")
+                    continue
 
-            # If we encountered posts older than cutoff, stop scrolling
-            if hit_old_posts:
-                print(f"{Fore.YELLOW}⏹️  Reached posts older than {recent_days} days, stopping...{Style.RESET_ALL}")
-                found_old_posts = True
-                break
+                # Extract the post data
+                post_data = await self._extract_post_data(container)
 
-            # Scroll down to load more
-            await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-            await asyncio.sleep(2)
+                if post_data:
+                    print(f"{Fore.GREEN}✓ Found original post: {post_data['post_id']}{Style.RESET_ALL}")
+                    return post_data
 
-            # Check if we've reached the bottom
-            new_height = await self.page.evaluate('document.body.scrollHeight')
-            if new_height == last_height:
-                scroll_attempts += 1
-            else:
-                scroll_attempts = 0
+            except Exception as e:
+                # Skip posts that fail to extract
+                continue
 
-            last_height = new_height
+        return None
 
-        print(f"{Fore.GREEN}Found {len(posts)} posts{Style.RESET_ALL}")
-        return posts[:max_posts]
+    async def _is_repost(self, container) -> bool:
+        """Check if a post is a repost/reshare.
+
+        Args:
+            container: Post container element
+
+        Returns:
+            True if post is a repost, False otherwise
+        """
+        try:
+            # Look for repost indicators
+            repost_indicators = [
+                'span.update-components-actor__description:has-text("reposted")',
+                'span:has-text("reposted this")',
+                'span.feed-shared-actor__description:has-text("reposted")',
+                'div:has-text("reposted")'
+            ]
+
+            for selector in repost_indicators:
+                element = await container.query_selector(selector)
+                if element:
+                    text = await element.inner_text()
+                    if text and 'repost' in text.lower():
+                        return True
+
+            # Also check for reshare icon or badge
+            reshare_icon = await container.query_selector('svg[data-test-icon="repost-medium"], svg[data-test-icon="share-medium"]')
+            if reshare_icon:
+                # Check if it's in a prominent position (indicating a reshare)
+                return True
+
+            return False
+
+        except Exception:
+            # If we can't determine, assume it's not a repost
+            return False
 
     async def _extract_posts_from_page(self, cutoff_date: Optional[datetime] = None) -> tuple:
         """Extract posts from current page view.

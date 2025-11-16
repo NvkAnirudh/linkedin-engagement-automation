@@ -12,11 +12,11 @@ monitoring:
   # How often to check for new posts (in minutes)
   check_interval: 30
 
-  # Maximum number of posts to fetch per check
-  max_posts_per_check: 10
-
-  # Only track posts from last N days
-  track_recent_days: 7
+  # NOTE: The scraper now only fetches the LATEST ORIGINAL POST (excludes reposts)
+  # max_posts_per_check and track_recent_days are ignored
+  # This ensures we only engage with the influencer's most recent original content
+  max_posts_per_check: 1  # Always 1 - latest original post only
+  track_recent_days: 0    # Ignored - we just get the latest post
 
 # Comment generation settings
 comment_generation:
