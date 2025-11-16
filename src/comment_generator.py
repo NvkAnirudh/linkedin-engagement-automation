@@ -40,7 +40,7 @@ class CommentGenerator:
 
         # Initialize AI client
         if self.provider == "openai":
-            openai.api_key = self.api_key
+            self.client = openai.OpenAI(api_key=self.api_key)
         elif self.provider == "anthropic":
             self.client = anthropic.Anthropic(api_key=self.api_key)
 
@@ -149,7 +149,7 @@ Generate the comment now:"""
         Returns:
             AI response text
         """
-        response = openai.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {
