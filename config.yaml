@@ -4,8 +4,8 @@
 profiles:
   - url: "https://www.linkedin.com/in/example-profile/"
     name: "Zach"
-    # Note: Comment style is now automatically matched to the post's detected tone
-    # No need to specify a fixed style - the AI will adapt!
+    # Optional: custom comment style for this profile
+    comment_style: "professional"  # professional, casual, enthusiastic, thoughtful
 
 # Monitoring settings
 monitoring:
