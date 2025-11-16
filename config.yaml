@@ -1,0 +1,55 @@
+# LinkedIn Influencer Tracker Configuration
+
+# Profiles to track (LinkedIn profile URLs or usernames)
+profiles:
+  - url: "https://www.linkedin.com/in/example-profile/"
+    name: "Zach"
+    # Optional: custom comment style for this profile
+    comment_style: "professional"  # professional, casual, enthusiastic, thoughtful
+
+# Monitoring settings
+monitoring:
+  # How often to check for new posts (in minutes)
+  check_interval: 30
+
+  # Maximum number of posts to fetch per check
+  max_posts_per_check: 10
+
+  # Only track posts from last N days
+  track_recent_days: 7
+
+# Comment generation settings
+comment_generation:
+  # Style options: professional, casual, enthusiastic, thoughtful, supportive
+  default_style: "professional"
+
+  # Length: short (5-10 words), medium (10-20 words), long (20-30 words)
+  length: "short"
+
+  # Include emojis in comments
+  include_emojis: false
+
+  # Tone analysis: analyze post tone before generating comment
+  analyze_tone: true
+
+# Excel tracking settings
+tracking:
+  # Path to Excel file
+  excel_file: "data/tracked_posts.xlsx"
+
+  # Path to seen posts cache
+  cache_file: "data/seen_posts.json"
+
+  # Include post engagement metrics (likes, comments, shares)
+  include_metrics: true
+
+# Safety settings
+safety:
+  # Do not actually post comments (just generate and log them)
+  dry_run: true
+
+  # Maximum comments per day per profile
+  max_comments_per_day: 10
+
+  # Randomize check times to avoid detection
+  randomize_timing: true
