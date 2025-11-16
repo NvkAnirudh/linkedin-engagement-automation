@@ -70,8 +70,12 @@ class LinkedInScraper:
             # Click login button
             await self.page.click('button[type="submit"]')
 
-            # Wait for navigation
-            await self.page.wait_for_load_state('networkidle', timeout=30000)
+            # Wait for navigation with more lenient load state
+            try:
+                await self.page.wait_for_load_state('domcontentloaded', timeout=15000)
+            except Exception:
+                # If domcontentloaded times out, wait a bit and continue anyway
+                await asyncio.sleep(3)
 
             # Check for security checkpoints (multiple possible URLs)
             current_url = self.page.url
